@@ -8,47 +8,54 @@ class Itemizer
   def distribute(amount)
     sorted = @collection.sort { |item| item[:quantity] }.reverse
 
-    distribute_amount_to(sorted, amount)
+    distribute_amount_to(@collection.dup, amount)
   end
+
+  private
 
   def total_quantity
     @collection.reduce(0) { |total, item| total + item[:quantity] }
   end
 
-  private
-
   def distribute_amount_to(collection, amount)
-    if one_to_each?(collection, amount)
-      return distribute_remaining_to(collection, amount)
-    end
-
     distributed = collection.map do |item|
       item.tap { |it| it[:total] += proportion_of_amount(item, amount) }
     end
 
-    remaining = collection.reduce(amount) do |rem, item|
-      rem - proportion_of_amount(item, amount)
+    difference = collection.reduce(amount) do |diff, item|
+      diff - proportion_of_amount(item, amount)
     end
 
-    distribute_amount_to(distributed, remaining)
+    adjust_by(distributed, difference)
   end
 
-  def distribute_remaining_to(collection, remaining)
-    collection.map do |item|
-      next item if remaining.zero?
+  def adjust_by(collection, amount)
+    if amount.negative?
+      decrease_by(collection, amount)
+    else
+      increase_by(collection, amount)
+    end
+  end
 
-      remaining -= 1
+  def decrease_by(collection, amount)
+    collection.sort_by { |item| item[:quantity] }.map do |item|
+      next item if amount.zero?
+
+      amount += 1
+      item.tap { |it| it[:total] -= 1 }
+    end
+  end
+
+  def increase_by(collection, amount)
+    collection.sort_by { |item| item[:quantity] }.reverse.map do |item|
+      next item if amount.zero?
+
+      amount -= 1
       item.tap { |it| it[:total] += 1 }
     end
   end
 
-  def one_to_each?(collection, amount)
-    collection.all? do |item|
-      proportion_of_amount(item, amount).zero?
-    end
-  end
-
   def proportion_of_amount(item, amount)
-    (item[:quantity].to_f / total_quantity * amount).floor
+    (item[:quantity].to_f / total_quantity * amount).round
   end
 end
